@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset='utf-8' />
+    <title>Philadelphia vehicle collisions</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+</head>
+<style>
+    body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+     
+    #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    }
+     
+    h1 {
+    font-size: 20px;
+    line-height: 30px;
+    }
+     
+    h2 {
+    font-size: 14px;
+    line-height: 20px;
+    margin-bottom: 10px;
+    }
+     
+    a {
+    text-decoration: none;
+    color: #2dc4b2;
+    }
+     
+    #console {
+    position: absolute;
+    margin: 10px;
+    width: 240px;
+    background-color: white;
+    padding: 10px 20px;
+    }
+    .session {
+      margin-bottom: 20px;
+    }
+
+    .row {
+      height: 12px;
+      width: 100%;
+    }
+
+    .colors {
+      background: linear-gradient(to right, #2dc4b2, #3bb3c3, #669ec4, #5f5aab, #fbb03b, #e55e5e);
+      margin-bottom: 5px;
+    }
+
+    .label {
+      width: 15%;
+      display: inline-block;
+      text-align: center;
+    }
+     
+    </style>
+    <body>
+        <div id='map'></div>
+        <div id='console'>
+            <h1>Motor vehicle collisions</h1>
+            <p>Data: <a>Motor vehicle collision</a> in Philadelphia, Year 2017</p>
+            <div class='session'>
+                <h2>Collisons</h2>
+                <div class='row colors'>
+                </div>
+                <div class='row labels'>
+                  <div class='label'>0</div>
+                  <div class='label'>1</div>
+                  <div class='label'>2</div>
+                  <div class='label'>3</div>
+                  <div class='label'>4</div>
+                  <div class='label'>5+</div>
+                </div>
+            </div>
+            <div class="session">
+                <h2>Hour: <label id="active-hour">12PM</label></h2>
+                <input
+                    id="slider"
+                    class="row"
+                    type="range"
+                    min="0"
+                    max="23"
+                    step="1"
+                    value="12"
+                />
+            </div>
+            <div class="session">
+                <h2>Day of the week</h2>
+                <div class="row" id="filters">
+                    <input
+                    id="all"
+                    type="radio"
+                    name="toggle"
+                    value="all"
+                    checked="checked"
+                />
+            <label for="all">All</label>
+            <input id="weekday" type="radio" name="toggle" value="weekday" />
+            <label for="weekday">Weekday</label>
+            <input id="weekend" type="radio" name="toggle" value="weekend" />
+            <label for="weekend">Weekend</label>
+            </div>
+        </div>    
+    </div>
+    <script>    
+        mapboxgl.accessToken = 'pk.eyJ1IjoidmVua2F0YTEyMyIsImEiOiJjbHAxdnhjZHYwbWN6MnJwNXA2d3Q5ZWY2In0.XMS2-tg8MGF-B2voxb4SIw';
+        const map = new mapboxgl.Map({
+            container: 'map', // container element id
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-75.1553, 39.9811], // initial map center in [lon, lat]
+            zoom: 12
+         });
+         map.on('load', () => {
+            let filterHour = ['==', ['number', ['get', 'hour_of_da']], 12];
+            let filterDay = ['!=', ['number', ['get', 'day_of_wee']], 0];
+
+            map.addLayer({
+                id: 'collisions',
+                type: 'circle',
+                source: {
+                    type: 'geojson',
+                    data: 'Crash Data.geojson' // replace this with the url of your own geojson
+                },
+                paint: {
+                    'circle-radius': [
+                    'interpolate',
+                    ['linear'],
+                    ['number', ['get', 'collision_']],
+                    0,
+                    4,
+                    5,
+                    24
+                ],
+                'circle-color': [
+                'interpolate',
+                ['linear'],
+                ['number', ['get', 'collision_']],
+                0,
+                '#2DC4B2',
+                1,
+                '#3BB3C3',
+                2,
+                '#669EC4',
+                3,
+                '#5f5aab',
+                4,
+                '#fbb03b',
+                5,
+                '#e55e5e'
+            ],
+            'circle-opacity': 0.8
+        },
+        'filter': ['all', filterHour, filterDay]
+    });
+        // update hour filter when the slider is dragged
+        document.getElementById('slider').addEventListener('input', (event) => {
+        const hour = parseInt(event.target.value);
+        // update the map
+        filterHour = ['==', ['number', ['get', 'hour_of_da']], hour];
+        map.setFilter('collisions', ['all', filterHour, filterDay]);
+ 
+        // converting 0-23 hour to AMPM format
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 ? hour % 12 : 12;
+ 
+        // update text in the UI
+        document.getElementById('active-hour').innerText = hour12 + ampm;   
+    });
+    document
+        .getElementById('filters')
+        .addEventListener('change', (event) => {
+            const day = event.target.value;
+            // update the map filter
+            if (day === 'all') {
+                filterDay = ['!=', ['number', ['get', 'day_of_wee']], 0];
+            } else if (day === 'weekday') {
+                filterDay = [
+                'match',
+                ['get', 'day_of_wee'],
+                [6, 7],
+                false,
+                true
+             ];
+            } else if (day === 'weekend') {
+                filterDay = [
+                'match',
+                ['get', 'day_of_wee'],
+                [6, 7],
+                true,
+                false
+             ];
+            } else {
+              console.error('error');
+            }
+            map.setFilter('collisions', ['all', filterHour, filterDay]);
+        });
+    
+    });
+    </script>
+    </body>    
+</html>
+
